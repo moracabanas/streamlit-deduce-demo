@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  streamlit:
+    image: albertodeduce/streamlit-cam-demo:dev-prealpha-2021.12.12-20.26.58
+    restart: unless-stopped
+    # ports: 
+    #   - 80:8501
+    command: streamlit run ${STREAMLIT_REPO:-https://raw.githubusercontent.com/whitphx/streamlit-webrtc-example/main/app.py}
+    # Proxy config for LetsEncrypt challenge
+    environment: 
+      VIRTUAL_HOST: "${VIRTUAL_HOST:-subdomain.yourdomain.tld}"
+      VIRTUAL_PORT: "${VIRTUAL_PORT:-8000}"
+      LETSENCRYPT_HOST: "${LETSENCRYPT_HOST:-subdomain.yourdomain.tld}"
+
+  nginx-proxy:
+    image: nginxproxy/nginx-proxy
+    restart: unless-stopped
+    container_name: nginx-proxy
+    ports:
+      - 80:80
+      - 443:443
+    volumes: 
+      - ./certs:/etc/nginx/certs
+      - ./vhost:/etc/nginx/vhost.d
+      - ./html:/usr/share/nginx/html
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+
+  acme-companion:
+    image: nginxproxy/acme-companion
+    restart: unless-stopped
+    volumes: 
+      - ./certs:/etc/nginx/certs
+      - ./vhost:/etc/nginx/vhost.d
+      - ./html:/usr/share/nginx/html
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+      - ./acme:/etc/acme.sh
+    environment: 
+      DEFAULT_EMAIL: "${DEFAULT_EMAIL:-mail@yourdomain.tld}"
+      NGINX_PROXY_CONTAINER: "nginx-proxy"
